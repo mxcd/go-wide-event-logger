@@ -3,7 +3,7 @@ package wideevent
 import "testing"
 
 func TestNestSingleLevelKey(t *testing.T) {
-	fields := []field{{key: "name", value: "test"}}
+	fields := []Field{{Key: "name", Value: "test"}}
 	result := nestFields(fields)
 
 	if result["name"] != "test" {
@@ -12,7 +12,7 @@ func TestNestSingleLevelKey(t *testing.T) {
 }
 
 func TestNestDotKey(t *testing.T) {
-	fields := []field{{key: "a.b", value: "val"}}
+	fields := []Field{{Key: "a.b", Value: "val"}}
 	result := nestFields(fields)
 
 	a, ok := result["a"].(map[string]any)
@@ -25,7 +25,7 @@ func TestNestDotKey(t *testing.T) {
 }
 
 func TestNestDeepKey(t *testing.T) {
-	fields := []field{{key: "a.b.c", value: "deep"}}
+	fields := []Field{{Key: "a.b.c", Value: "deep"}}
 	result := nestFields(fields)
 
 	a, ok := result["a"].(map[string]any)
@@ -42,9 +42,9 @@ func TestNestDeepKey(t *testing.T) {
 }
 
 func TestNestMultipleKeysInSameGroup(t *testing.T) {
-	fields := []field{
-		{key: "a.b", value: "one"},
-		{key: "a.c", value: "two"},
+	fields := []Field{
+		{Key: "a.b", Value: "one"},
+		{Key: "a.c", Value: "two"},
 	}
 	result := nestFields(fields)
 
@@ -61,9 +61,9 @@ func TestNestMultipleKeysInSameGroup(t *testing.T) {
 }
 
 func TestNestMixedFlatAndNested(t *testing.T) {
-	fields := []field{
-		{key: "flat", value: "yes"},
-		{key: "nested.key", value: "deep"},
+	fields := []Field{
+		{Key: "flat", Value: "yes"},
+		{Key: "nested.key", Value: "deep"},
 	}
 	result := nestFields(fields)
 
@@ -80,7 +80,7 @@ func TestNestMixedFlatAndNested(t *testing.T) {
 }
 
 func TestNestFourLevels(t *testing.T) {
-	fields := []field{{key: "a.b.c.d", value: 42}}
+	fields := []Field{{Key: "a.b.c.d", Value: 42}}
 	result := nestFields(fields)
 
 	a := result["a"].(map[string]any)

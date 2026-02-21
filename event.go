@@ -6,16 +6,17 @@ import (
 	"time"
 )
 
-type field struct {
-	key   string
-	value any
+// Field represents a single key-value pair in a wide event.
+type Field struct {
+	Key   string
+	Value any
 }
 
 // Event represents a single wide event that accumulates structured fields
 // throughout a unit of work and emits them as one rich log line.
 type Event struct {
 	mu        sync.Mutex
-	fields    []field
+	fields    []Field
 	emitter   Emitter
 	startTime time.Time
 	emitted   bool
@@ -25,11 +26,11 @@ type Event struct {
 // The caller is responsible for calling Emit() when the work is done.
 func Begin(emitter Emitter, name string) *Event {
 	e := &Event{
-		fields:    make([]field, 0, 32),
+		fields:    make([]Field, 0, 32),
 		emitter:   emitter,
 		startTime: time.Now(),
 	}
-	e.fields = append(e.fields, field{key: "name", value: name})
+	e.fields = append(e.fields, Field{Key: "name", Value: name})
 	return e
 }
 
@@ -43,7 +44,7 @@ func (e *Event) Emit() {
 	}
 	e.emitted = true
 	dur := time.Since(e.startTime)
-	e.fields = append(e.fields, field{key: "duration", value: dur})
+	e.fields = append(e.fields, Field{Key: "duration", Value: dur})
 	e.mu.Unlock()
 
 	if e.emitter != nil {
@@ -54,7 +55,7 @@ func (e *Event) Emit() {
 // Set adds a field with any value. The key can contain dots for nested JSON output.
 func (e *Event) Set(key string, value any) *Event {
 	e.mu.Lock()
-	e.fields = append(e.fields, field{key: key, value: value})
+	e.fields = append(e.fields, Field{Key: key, Value: value})
 	e.mu.Unlock()
 	return e
 }
@@ -146,11 +147,11 @@ func (e *Event) HasError() bool {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	for _, f := range e.fields {
-		if f.key == "outcome" && f.value == "failure" {
+		if f.Key == "outcome" && f.Value == "failure" {
 			return true
 		}
-		if f.key == "response.status" {
-			if code, ok := f.value.(int); ok && code >= 500 {
+		if f.Key == "response.status" {
+			if code, ok := f.Value.(int); ok && code >= 500 {
 				return true
 			}
 		}
@@ -163,8 +164,8 @@ func (e *Event) StatusCode() int {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	for _, f := range e.fields {
-		if f.key == "response.status" {
-			if code, ok := f.value.(int); ok {
+		if f.Key == "response.status" {
+			if code, ok := f.Value.(int); ok {
 				return code
 			}
 		}
@@ -173,10 +174,16 @@ func (e *Event) StatusCode() int {
 }
 
 // Fields returns a snapshot copy of all fields.
-func (e *Event) Fields() []field {
+func (e *Event) Fields() []Field {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	cp := make([]field, len(e.fields))
+	cp := make([]Field, len(e.fields))
 	copy(cp, e.fields)
 	return cp
+}
+
+// FieldsMap returns all fields as a nested map, expanding dot-separated keys.
+// This is a convenience method for custom emitters that need structured data.
+func (e *Event) FieldsMap() map[string]any {
+	return nestFields(e.Fields())
 }

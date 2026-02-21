@@ -51,10 +51,10 @@ func inferLevel(evt *Event) string {
 }
 
 // convertFieldValues converts typed values to JSON-friendly representations.
-func convertFieldValues(fields []field) []field {
-	out := make([]field, len(fields))
+func convertFieldValues(fields []Field) []Field {
+	out := make([]Field, len(fields))
 	for i, f := range fields {
-		out[i] = field{key: f.key, value: convertValue(f.value)}
+		out[i] = Field{Key: f.Key, Value: convertValue(f.Value)}
 	}
 	return out
 }
@@ -68,4 +68,13 @@ func convertValue(v any) any {
 	default:
 		return v
 	}
+}
+
+// MultiEmitter fans out to multiple emitters. All emitters receive every event.
+func MultiEmitter(emitters ...Emitter) Emitter {
+	return EmitterFunc(func(evt *Event) {
+		for _, e := range emitters {
+			e.Emit(evt)
+		}
+	})
 }

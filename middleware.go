@@ -29,7 +29,7 @@ func Middleware(opts ...Option) gin.HandlerFunc {
 		start := time.Now()
 
 		evt := &Event{
-			fields:    make([]field, 0, 32),
+			fields:    make([]Field, 0, 32),
 			emitter:   cfg.emitter,
 			startTime: start,
 		}
@@ -76,7 +76,7 @@ func Middleware(opts ...Option) gin.HandlerFunc {
 		if cfg.sampler.ShouldSample(evt) {
 			evt.mu.Lock()
 			dur := time.Since(evt.startTime)
-			evt.fields = append(evt.fields, field{key: "duration", value: dur})
+			evt.fields = append(evt.fields, Field{Key: "duration", Value: dur})
 			evt.emitted = true
 			evt.mu.Unlock()
 			cfg.emitter.Emit(evt)

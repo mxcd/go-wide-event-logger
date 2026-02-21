@@ -36,7 +36,7 @@ func TestConcurrentFieldAccumulation(t *testing.T) {
 	// Verify all 100 goroutine fields are present
 	seen := make(map[string]bool)
 	for _, f := range fields {
-		seen[f.key] = true
+		seen[f.Key] = true
 	}
 	for i := 0; i < 100; i++ {
 		key := fmt.Sprintf("field_%d", i)
@@ -200,10 +200,10 @@ func TestEmitOnlyOnce(t *testing.T) {
 
 // helpers
 
-func fieldsToMap(fields []field) map[string]any {
+func fieldsToMap(fields []Field) map[string]any {
 	m := make(map[string]any)
 	for _, f := range fields {
-		m[f.key] = f.value
+		m[f.Key] = f.Value
 	}
 	return m
 }
