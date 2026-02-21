@@ -106,6 +106,15 @@ we.UserName("john")       // sets user.name
 we.UserRole("admin")      // sets user.role
 ```
 
+### Event Inspection
+
+```go
+evt.Fields()        // []wideevent.Field — snapshot of all key-value pairs
+evt.FieldsMap()     // map[string]any — nested map with dot keys expanded
+evt.HasError()      // bool — true if outcome="failure" or status >= 500
+evt.StatusCode()    // int — response status code, or 0 if not set
+```
+
 ### Nested Keys via Dots
 
 Keys containing dots produce nested JSON:
@@ -226,19 +235,33 @@ func (r *Repository) UpdateUser(ctx context.Context, id uuid.UUID, p *UpdatePara
 
 ### Custom Emitter
 
+Implement the `Emitter` interface to send events anywhere — a database, an external service, etc. Use `evt.Fields()` for raw key-value pairs or `evt.FieldsMap()` for a pre-nested `map[string]any`.
+
 ```go
-type DatadogEmitter struct {
-    client *datadog.Client
+type DBLogEmitter struct {
+    db *ent.Client
 }
 
-func (d *DatadogEmitter) Emit(evt *wideevent.Event) {
-    fields := evt.Fields()
-    // Convert to Datadog format and send
+func (e *DBLogEmitter) Emit(evt *wideevent.Event) {
+    fields := evt.FieldsMap() // nested map[string]any, dot keys already expanded
+    data, _ := json.Marshal(fields)
+    e.db.Log.Create().
+        SetLevel(fields["level"].(string)).
+        SetData(data).
+        SaveX(context.Background())
 }
+```
 
-// Use it:
+### MultiEmitter
+
+Use `MultiEmitter` to fan out events to multiple destinations simultaneously:
+
+```go
 r.Use(wideevent.Middleware(
-    wideevent.WithEmitter(&DatadogEmitter{client: ddClient}),
+    wideevent.WithEmitter(wideevent.MultiEmitter(
+        wideevent.JSONStdoutEmitter(),   // structured logs to stdout
+        &DBLogEmitter{db: client},        // persist to database
+    )),
 ))
 ```
 
