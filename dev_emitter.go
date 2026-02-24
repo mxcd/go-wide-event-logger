@@ -32,9 +32,11 @@ type categoryRule struct {
 }
 
 type devEmitterConfig struct {
-	color          *bool // nil = auto-detect
-	categories     []categoryRule
-	muteCategories map[string]bool
+	color              *bool // nil = auto-detect
+	categories         []categoryRule
+	muteCategories     map[string]bool
+	durationWarn       *time.Duration
+	durationError      *time.Duration
 }
 
 // WithColor forces color output on or off, overriding TTY auto-detection.
@@ -50,6 +52,16 @@ func WithColor(enabled bool) DevEmitterOption {
 func WithCategory(name string, pathPrefixes ...string) DevEmitterOption {
 	return func(cfg *devEmitterConfig) {
 		cfg.categories = append(cfg.categories, categoryRule{name: name, prefixes: pathPrefixes})
+	}
+}
+
+// WithDurationThresholds configures the color scale for duration values in the footer.
+// Durations below warn are green, between warn and err are yellow, at or above err are red.
+// Default thresholds are 500ms (warn) and 2s (error).
+func WithDurationThresholds(warn, err time.Duration) DevEmitterOption {
+	return func(cfg *devEmitterConfig) {
+		cfg.durationWarn = &warn
+		cfg.durationError = &err
 	}
 }
 
@@ -89,19 +101,36 @@ func newDevEmitter(w io.Writer, defaultColor bool, opts ...DevEmitterOption) Emi
 	if cfg.color != nil {
 		useColor = *cfg.color
 	}
+	durationWarn := defaultDurationWarn
+	if cfg.durationWarn != nil {
+		durationWarn = *cfg.durationWarn
+	}
+	durationError := defaultDurationError
+	if cfg.durationError != nil {
+		durationError = *cfg.durationError
+	}
 	return &devEmitter{
 		w:              w,
 		color:          useColor,
 		categories:     cfg.categories,
 		muteCategories: cfg.muteCategories,
+		durationWarn:   durationWarn,
+		durationError:  durationError,
 	}
 }
+
+const (
+	defaultDurationWarn  = 500 * time.Millisecond
+	defaultDurationError = 2 * time.Second
+)
 
 type devEmitter struct {
 	w              io.Writer
 	color          bool
 	categories     []categoryRule
 	muteCategories map[string]bool
+	durationWarn   time.Duration
+	durationError  time.Duration
 }
 
 // Fields shown in the header/footer lines, excluded from the grouped body.
@@ -179,6 +208,7 @@ func (d *devEmitter) Emit(evt *Event) {
 	// Footer: └ outcome=success  duration=12.5ms
 	d.writeFooter(&b, outcome, errMsg, hasDuration, duration)
 
+	b.WriteByte('\n')
 	fmt.Fprint(d.w, b.String())
 }
 
@@ -257,6 +287,10 @@ func (d *devEmitter) writeHeader(b *strings.Builder, level, method, path, name, 
 	levelColor := d.levelColor(level)
 	d.writeColor(b, levelColor+ansiBold)
 	b.WriteString("┌ ")
+	d.writeColor(b, ansiReset)
+	d.writeDim(b, time.Now().Format("15:04:05.000"))
+	b.WriteString("  ")
+	d.writeColor(b, levelColor+ansiBold)
 
 	if method != "" && path != "" {
 		b.WriteString(method)
@@ -356,7 +390,10 @@ func (d *devEmitter) writeFooter(b *strings.Builder, outcome, errMsg string, has
 
 	first := true
 	if outcome != "" {
-		d.writeKeyValue(b, "outcome", outcome)
+		d.writeDim(b, "outcome=")
+		d.writeColor(b, d.outcomeColor(outcome))
+		b.WriteString(outcome)
+		d.writeColor(b, ansiReset)
 		first = false
 	}
 	if errMsg != "" {
@@ -373,7 +410,10 @@ func (d *devEmitter) writeFooter(b *strings.Builder, outcome, errMsg string, has
 		if !first {
 			b.WriteString("  ")
 		}
-		d.writeKeyValue(b, "duration", devFormatDuration(duration))
+		d.writeDim(b, "duration=")
+		d.writeColor(b, d.durationColor(duration))
+		b.WriteString(devFormatDuration(duration))
+		d.writeColor(b, ansiReset)
 	}
 	d.writeColor(b, ansiReset)
 	b.WriteByte('\n')
@@ -407,6 +447,27 @@ func (d *devEmitter) levelColor(level string) string {
 	default:
 		return ansiGreen
 	}
+}
+
+func (d *devEmitter) outcomeColor(outcome string) string {
+	switch outcome {
+	case "success":
+		return ansiGreen
+	case "error":
+		return ansiRed
+	default:
+		return ""
+	}
+}
+
+func (d *devEmitter) durationColor(dur time.Duration) string {
+	if dur >= d.durationError {
+		return ansiRed
+	}
+	if dur >= d.durationWarn {
+		return ansiYellow
+	}
+	return ansiGreen
 }
 
 func (d *devEmitter) statusColor(code int) string {

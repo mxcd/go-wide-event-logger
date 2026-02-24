@@ -26,7 +26,7 @@ func TestDevEmitterInfoHTTP(t *testing.T) {
 	out := buf.String()
 
 	// Header should contain method, path, status, latency
-	if !strings.Contains(out, "┌ GET /api/v1/users") {
+	if !strings.Contains(out, "GET /api/v1/users") {
 		t.Errorf("header missing method/path, got:\n%s", out)
 	}
 	if !strings.Contains(out, "200") {
@@ -71,7 +71,7 @@ func TestDevEmitterErrorHTTP(t *testing.T) {
 
 	out := buf.String()
 
-	if !strings.Contains(out, "┌ POST /api/v1/users") {
+	if !strings.Contains(out, "POST /api/v1/users") {
 		t.Errorf("header missing, got:\n%s", out)
 	}
 	if !strings.Contains(out, "500") {
@@ -98,7 +98,7 @@ func TestDevEmitterWarnHTTP(t *testing.T) {
 
 	out := buf.String()
 
-	if !strings.Contains(out, "┌ GET /api/v1/missing") {
+	if !strings.Contains(out, "GET /api/v1/missing") {
 		t.Errorf("header missing, got:\n%s", out)
 	}
 	if !strings.Contains(out, "404") {
@@ -118,7 +118,7 @@ func TestDevEmitterStandalone(t *testing.T) {
 
 	out := buf.String()
 
-	if !strings.Contains(out, "┌ sync_users") {
+	if !strings.Contains(out, "sync_users") {
 		t.Errorf("header should show event name, got:\n%s", out)
 	}
 	if !strings.Contains(out, "queries=12") {
@@ -277,7 +277,7 @@ func TestDevEmitterCategoryLabel(t *testing.T) {
 	if !strings.Contains(out, "[assets]") {
 		t.Errorf("expected [assets] category label in header, got:\n%s", out)
 	}
-	if !strings.Contains(out, "┌ GET /src/assets/logo.png") {
+	if !strings.Contains(out, "GET /src/assets/logo.png") {
 		t.Errorf("expected path in header, got:\n%s", out)
 	}
 }
@@ -321,7 +321,7 @@ func TestDevEmitterUnmutedCategory(t *testing.T) {
 	if !strings.Contains(out, "[api]") {
 		t.Errorf("expected [api] label for unmuted category, got:\n%s", out)
 	}
-	if !strings.Contains(out, "┌ GET /api/v1/users") {
+	if !strings.Contains(out, "GET /api/v1/users") {
 		t.Errorf("expected normal output for unmuted category, got:\n%s", out)
 	}
 }
@@ -346,7 +346,7 @@ func TestDevEmitterNoCategoryMatch(t *testing.T) {
 			t.Errorf("should not have category label for unmatched path, got:\n%s", out)
 		}
 	}
-	if !strings.Contains(out, "┌ GET /api/v1/users") {
+	if !strings.Contains(out, "GET /api/v1/users") {
 		t.Errorf("expected normal output, got:\n%s", out)
 	}
 }
@@ -406,7 +406,7 @@ func TestDevEmitterEmptyEvent(t *testing.T) {
 	evt.Emit()
 
 	out := buf.String()
-	if !strings.Contains(out, "┌ minimal") {
+	if !strings.Contains(out, "minimal") {
 		t.Errorf("expected name in header, got:\n%s", out)
 	}
 	if !strings.Contains(out, "└") {
