@@ -125,6 +125,76 @@ we.Set("db.entity", "user")
 // Output: {"db": {"operation": "update", "entity": "user"}}
 ```
 
+## Dev Mode
+
+For local development, use `DevStdoutEmitter()` for human-readable, colorized output with unicode tree formatting:
+
+```go
+r.Use(wideevent.Middleware(
+    wideevent.WithEmitter(wideevent.DevStdoutEmitter()),
+))
+```
+
+Output:
+
+```
+┌ GET /api/v1/users/abc-123                    200  12.4ms
+│
+│  request   method=GET  path=/api/v1/users/abc-123
+│            host=localhost:8080  client_ip=127.0.0.1
+│  response  status=200  body_size=1842  latency_ms=12.4
+│  user      id=def-456  name=john  role=admin
+│  db        operation=update  entity=user
+│  cache     hit=false
+│
+└ outcome=success  duration=12.5ms
+```
+
+Colors are auto-detected based on terminal capability. Use `WithColor(true/false)` to override:
+
+```go
+wideevent.DevStdoutEmitter(wideevent.WithColor(false)) // force no color
+```
+
+Use `DevWriterEmitter` for custom output targets:
+
+```go
+wideevent.DevWriterEmitter(os.Stderr, wideevent.WithColor(true))
+```
+
+Combine with JSON for file logging using `MultiEmitter`:
+
+```go
+wideevent.WithEmitter(wideevent.MultiEmitter(
+    wideevent.DevStdoutEmitter(),          // pretty terminal output
+    wideevent.JSONWriterEmitter(logFile),   // structured JSON to file
+))
+```
+
+### Path Categories & Muting
+
+Group request paths into named categories and mute noisy ones:
+
+```go
+wideevent.DevStdoutEmitter(
+    wideevent.WithCategory("assets", "/src/assets", "/static"),
+    wideevent.WithCategory("health", "/health", "/ready"),
+    wideevent.WithCategory("api", "/api"),
+    wideevent.WithMuteCategories("assets", "health"),
+)
+```
+
+Muted categories produce no output. Non-muted categories show a label in the header:
+
+```
+┌ GET /api/v1/users/abc-123  [api]  200  12.4ms
+│
+│  ...
+└ outcome=success  duration=12.5ms
+```
+
+Categories use prefix matching — `WithCategory("assets", "/src/assets")` matches `/src/assets/logo.png`, `/src/assets/styles.css`, etc.
+
 ## Setup Options
 
 ```go
