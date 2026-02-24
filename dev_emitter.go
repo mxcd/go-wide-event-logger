@@ -314,8 +314,8 @@ func (d *devEmitter) writeGroup(b *strings.Builder, prefix string, entries []fie
 
 	lineLen := bodyIndent + prefixWidth
 	for i, e := range entries {
-		pair := fmt.Sprintf("%s=%s", e.displayKey, devFormatValue(e.value))
-		if i > 0 && lineLen+len(pair)+2 > maxLineWidth {
+		plainPair := fmt.Sprintf("%s=%s", e.displayKey, devFormatValue(e.value))
+		if i > 0 && lineLen+len(plainPair)+2 > maxLineWidth {
 			b.WriteByte('\n')
 			d.writeDim(b, "│")
 			b.WriteString(strings.Repeat(" ", 2+prefixWidth))
@@ -324,8 +324,8 @@ func (d *devEmitter) writeGroup(b *strings.Builder, prefix string, entries []fie
 			b.WriteString("  ")
 			lineLen += 2
 		}
-		b.WriteString(pair)
-		lineLen += len(pair)
+		d.writeKeyValue(b, e.displayKey, devFormatValue(e.value))
+		lineLen += len(plainPair)
 	}
 	b.WriteByte('\n')
 }
@@ -335,8 +335,8 @@ func (d *devEmitter) writeUngrouped(b *strings.Builder, entries []fieldEntry) {
 	b.WriteString(strings.Repeat(" ", 2+prefixWidth))
 	lineLen := bodyIndent + prefixWidth
 	for i, e := range entries {
-		pair := fmt.Sprintf("%s=%s", e.displayKey, devFormatValue(e.value))
-		if i > 0 && lineLen+len(pair)+2 > maxLineWidth {
+		plainPair := fmt.Sprintf("%s=%s", e.displayKey, devFormatValue(e.value))
+		if i > 0 && lineLen+len(plainPair)+2 > maxLineWidth {
 			b.WriteByte('\n')
 			d.writeDim(b, "│")
 			b.WriteString(strings.Repeat(" ", 2+prefixWidth))
@@ -345,8 +345,8 @@ func (d *devEmitter) writeUngrouped(b *strings.Builder, entries []fieldEntry) {
 			b.WriteString("  ")
 			lineLen += 2
 		}
-		b.WriteString(pair)
-		lineLen += len(pair)
+		d.writeKeyValue(b, e.displayKey, devFormatValue(e.value))
+		lineLen += len(plainPair)
 	}
 	b.WriteByte('\n')
 }
@@ -354,22 +354,27 @@ func (d *devEmitter) writeUngrouped(b *strings.Builder, entries []fieldEntry) {
 func (d *devEmitter) writeFooter(b *strings.Builder, outcome, errMsg string, hasDuration bool, duration time.Duration) {
 	d.writeDim(b, "└ ")
 
-	parts := make([]string, 0, 3)
+	first := true
 	if outcome != "" {
-		parts = append(parts, fmt.Sprintf("outcome=%s", outcome))
+		d.writeKeyValue(b, "outcome", outcome)
+		first = false
 	}
 	if errMsg != "" {
-		var sb strings.Builder
-		d.writeColor(&sb, ansiRed)
-		fmt.Fprintf(&sb, "error=%s", errMsg)
-		d.writeColor(&sb, ansiReset)
-		parts = append(parts, sb.String())
+		if !first {
+			b.WriteString("  ")
+		}
+		d.writeDim(b, "error=")
+		d.writeColor(b, ansiRed)
+		b.WriteString(errMsg)
+		d.writeColor(b, ansiReset)
+		first = false
 	}
 	if hasDuration {
-		parts = append(parts, fmt.Sprintf("duration=%s", devFormatDuration(duration)))
+		if !first {
+			b.WriteString("  ")
+		}
+		d.writeKeyValue(b, "duration", devFormatDuration(duration))
 	}
-
-	b.WriteString(strings.Join(parts, "  "))
 	d.writeColor(b, ansiReset)
 	b.WriteByte('\n')
 }
@@ -386,6 +391,11 @@ func (d *devEmitter) writeDim(b *strings.Builder, s string) {
 	d.writeColor(b, ansiDim)
 	b.WriteString(s)
 	d.writeColor(b, ansiReset)
+}
+
+func (d *devEmitter) writeKeyValue(b *strings.Builder, key, value string) {
+	d.writeDim(b, key+"=")
+	b.WriteString(value)
 }
 
 func (d *devEmitter) levelColor(level string) string {
