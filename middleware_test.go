@@ -2,6 +2,7 @@ package wideevent
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -345,5 +346,59 @@ func TestMiddlewareGinErrors(t *testing.T) {
 	}
 	if m["response.gin_error.1"] == nil {
 		t.Error("expected gin_error.1")
+	}
+}
+
+func TestMiddlewarePanicEmitsAndRepanics(t *testing.T) {
+	capture := &captureEmitter{}
+	engine := gin.New()
+	// Recovery outside the wide event middleware, as registered by the agentic template.
+	engine.Use(gin.RecoveryWithWriter(io.Discard), Middleware(WithEmitter(capture), WithSampler(AlwaysOnError())))
+	engine.GET("/panic", func(c *gin.Context) {
+		panic("boom")
+	})
+
+	w := httptest.NewRecorder()
+	engine.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/panic", nil))
+
+	if w.Code != 500 {
+		t.Errorf("expected outer Recovery to answer 500, got %d", w.Code)
+	}
+	if len(capture.events) != 1 {
+		t.Fatalf("expected 1 event for a panicking request, got %d", len(capture.events))
+	}
+	m := fieldsToMap(capture.events[0].Fields())
+	assertEqual(t, m["response.status"], 500)
+	assertEqual(t, m["outcome"], "failure")
+	assertEqual(t, m["error"], "panic: boom")
+}
+
+func TestMiddlewareHonorsHandlerEmit(t *testing.T) {
+	engine, capture := setupEngine()
+	engine.GET("/early", func(c *gin.Context) {
+		FromGin(c).Emit()
+		c.Status(200)
+	})
+
+	w := httptest.NewRecorder()
+	engine.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/early", nil))
+
+	if len(capture.events) != 1 {
+		t.Errorf("expected 1 event after handler Emit(), got %d", len(capture.events))
+	}
+}
+
+func TestMiddlewareSamplesLatestStatus(t *testing.T) {
+	engine, capture := setupEngine(WithSampler(AlwaysOnStatus(403)))
+	engine.GET("/forbidden", func(c *gin.Context) {
+		FromGin(c).Set("response.status", 200)
+		c.AbortWithStatus(403)
+	})
+
+	w := httptest.NewRecorder()
+	engine.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/forbidden", nil))
+
+	if len(capture.events) != 1 {
+		t.Errorf("expected the 403 to be sampled, got %d events", len(capture.events))
 	}
 }
