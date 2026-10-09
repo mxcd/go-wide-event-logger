@@ -111,8 +111,8 @@ we.UserRole("admin")      // sets user.role
 ```go
 evt.Fields()        // []wideevent.Field — snapshot of all key-value pairs
 evt.FieldsMap()     // map[string]any — nested map with dot keys expanded
-evt.HasError()      // bool — true if outcome="failure" or status >= 500
-evt.StatusCode()    // int — response status code, or 0 if not set
+evt.HasError()      // bool — true if the latest outcome="failure" or latest status >= 500
+evt.StatusCode()    // int — latest response status code, or 0 if not set
 ```
 
 ### Nested Keys via Dots
