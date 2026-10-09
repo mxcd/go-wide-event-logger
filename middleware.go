@@ -2,6 +2,7 @@ package wideevent
 
 import (
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -54,32 +55,45 @@ func Middleware(opts ...Option) gin.HandlerFunc {
 			cfg.preEnricher(evt, c)
 		}
 
+		// Finalize in a defer so a panicking handler still produces an event. The panic is
+		// re-raised afterwards so an outer Recovery middleware keeps handling it.
+		defer func() {
+			rec := recover()
+			status := c.Writer.Status()
+			if rec != nil {
+				evt.Failure(fmt.Errorf("panic: %v", rec))
+				if !c.Writer.Written() {
+					status = http.StatusInternalServerError
+				}
+			}
+
+			// Set response fields
+			latency := time.Since(start)
+			evt.Set("response.status", status)
+			evt.Set("response.body_size", c.Writer.Size())
+			evt.Set("response.latency", latency)
+			evt.Set("response.latency_ms", float64(latency.Nanoseconds())/1e6)
+
+			ginErrors := c.Errors
+			evt.Set("response.gin_errors", len(ginErrors))
+			for i, e := range ginErrors {
+				evt.Set(fmt.Sprintf("response.gin_error.%d", i), e.Error())
+			}
+
+			if cfg.postEnricher != nil {
+				cfg.postEnricher(evt, c)
+			}
+
+			// Emit is a no-op if the handler already emitted the event.
+			if cfg.sampler.ShouldSample(evt) {
+				evt.Emit()
+			}
+
+			if rec != nil {
+				panic(rec)
+			}
+		}()
+
 		c.Next()
-
-		// Set response fields
-		latency := time.Since(start)
-		evt.Set("response.status", c.Writer.Status())
-		evt.Set("response.body_size", c.Writer.Size())
-		evt.Set("response.latency", latency)
-		evt.Set("response.latency_ms", float64(latency.Nanoseconds())/1e6)
-
-		ginErrors := c.Errors
-		evt.Set("response.gin_errors", len(ginErrors))
-		for i, e := range ginErrors {
-			evt.Set(fmt.Sprintf("response.gin_error.%d", i), e.Error())
-		}
-
-		if cfg.postEnricher != nil {
-			cfg.postEnricher(evt, c)
-		}
-
-		if cfg.sampler.ShouldSample(evt) {
-			evt.mu.Lock()
-			dur := time.Since(evt.startTime)
-			evt.fields = append(evt.fields, Field{Key: "duration", Value: dur})
-			evt.emitted = true
-			evt.mu.Unlock()
-			cfg.emitter.Emit(evt)
-		}
 	}
 }

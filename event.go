@@ -143,34 +143,34 @@ func (e *Event) UserRole(role string) *Event {
 }
 
 // HasError returns true if the event has an outcome of "failure" or a response status >= 500.
+// Like the emitted output, it reads the latest value of each field.
 func (e *Event) HasError() bool {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	for _, f := range e.fields {
-		if f.Key == "outcome" && f.Value == "failure" {
-			return true
-		}
-		if f.Key == "response.status" {
-			if code, ok := f.Value.(int); ok && code >= 500 {
-				return true
-			}
-		}
+	if e.last("outcome") == "failure" {
+		return true
 	}
-	return false
+	code, ok := e.last("response.status").(int)
+	return ok && code >= 500
 }
 
-// StatusCode returns the response status code, or 0 if not set.
+// StatusCode returns the latest response status code, or 0 if not set.
 func (e *Event) StatusCode() int {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	for _, f := range e.fields {
-		if f.Key == "response.status" {
-			if code, ok := f.Value.(int); ok {
-				return code
-			}
+	code, _ := e.last("response.status").(int)
+	return code
+}
+
+// last returns the latest value set for key, or nil. Later fields win, matching the
+// emitted output. The caller must hold e.mu.
+func (e *Event) last(key string) any {
+	for i := len(e.fields) - 1; i >= 0; i-- {
+		if e.fields[i].Key == key {
+			return e.fields[i].Value
 		}
 	}
-	return 0
+	return nil
 }
 
 // Fields returns a snapshot copy of all fields.

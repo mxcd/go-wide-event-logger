@@ -229,3 +229,17 @@ func stringContains(s, substr string) bool {
 	}
 	return false
 }
+
+func TestStatusCodeAndHasErrorUseLatest(t *testing.T) {
+	evt := Begin(nil, "latest_test")
+	evt.Set("response.status", 200).Set("response.status", 503)
+	if evt.StatusCode() != 503 {
+		t.Errorf("expected latest status 503, got %d", evt.StatusCode())
+	}
+
+	evt2 := Begin(nil, "latest_ok_test")
+	evt2.Set("response.status", 500).Set("response.status", 200)
+	if evt2.HasError() {
+		t.Error("latest status 200 should not count as error")
+	}
+}
